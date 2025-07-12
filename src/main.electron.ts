@@ -38,7 +38,7 @@ const createWindow = (): void => {
     minimizable: false,
     maximizable: false,
     closable: true,
-    focusable: isDebugMode, // Allow focus in debug mode
+    focusable: true, // Allow focus to enable context menu events
     hasShadow: false, // No shadow
     show: false, // Don't show until ready
     webPreferences: {
@@ -122,29 +122,30 @@ const createWindow = (): void => {
     showContextMenu(params.x, params.y);
   });
 
-  // Handle window ready
+  // In production mode, prevent the window from stealing focus
+  if (!isDebugMode) {
+    mainWindow.on('focus', () => {
+      // Immediately blur the window to prevent focus stealing
+      mainWindow?.blur();
+    });
+    
+    // Also prevent the window from showing in Alt+Tab
+    mainWindow.setSkipTaskbar(true);
+  }
+
+  // Show window when ready
   mainWindow.once('ready-to-show', () => {
-    if (mainWindow) {
-      console.log('🎭 Window ready to show');
-      mainWindow.show();
-      console.log('👀 Window shown');
-      
-      // Set click-through in production (not debug mode)
-      if (!isDebugMode) {
-        mainWindow.setIgnoreMouseEvents(true, { forward: true });
-        isClickThroughEnabled = true;
-        console.log('👆 Click-through enabled');
-      }
+    console.log('🎭 Window ready to show');
+    mainWindow?.show();
+    
+    // In production mode, blur immediately after showing to prevent focus stealing
+    if (!isDebugMode) {
+      setTimeout(() => {
+        mainWindow?.blur();
+        console.log('🎭 Production mode: Window blurred to prevent focus stealing');
+      }, 100);
     }
   });
-
-  // Force show after a delay if ready-to-show doesn't fire
-  setTimeout(() => {
-    if (mainWindow && !mainWindow.isVisible()) {
-      console.log('⏰ Force showing window after timeout');
-      mainWindow.show();
-    }
-  }, 3000);
 
   // Handle mouse events for dragging (only in debug mode)
   if (isDebugMode) {
@@ -174,8 +175,71 @@ const createWindow = (): void => {
   }
 };
 
-// Show context menu on right click
+// Show context menu on right click (only if over character)
 const showContextMenu = (x: number, y: number): void => {
+  // Check if the mouse is over the character using Live2D hit areas
+  if (mainWindow) {
+    mainWindow.webContents.executeJavaScript(`
+      (function() {
+        try {
+          // Get the canvas element
+          const canvas = document.querySelector('canvas');
+          if (!canvas) return false;
+          
+          // Get canvas bounds
+          const rect = canvas.getBoundingClientRect();
+          const canvasX = ${x} - rect.left;
+          const canvasY = ${y} - rect.top;
+          
+          // Check if click is within canvas bounds
+          if (canvasX < 0 || canvasX > rect.width || canvasY < 0 || canvasY > rect.height) {
+            return false;
+          }
+          
+          // Check if there's a Live2D model loaded and if we're clicking on the character
+          if (window.appDelegate) {
+            const manager = window.appDelegate.getLive2DManager();
+            if (manager && manager._models && manager._models.getSize() > 0) {
+              const model = manager._models.at(0);
+              if (model && model.getModel()) {
+                // Convert screen coordinates to Live2D coordinates
+                const view = window.appDelegate._subdelegates.at(0)._view;
+                const viewX = view.transformViewX(canvasX * window.devicePixelRatio);
+                const viewY = view.transformViewY(canvasY * window.devicePixelRatio);
+                
+                // Check if click is on Head or Body hit areas
+                const hitHead = model.hitTest("Head", viewX, viewY);
+                const hitBody = model.hitTest("Body", viewX, viewY);
+                
+                console.log('Hit test results - Head:', hitHead, 'Body:', hitBody, 'Coords:', viewX, viewY);
+                
+                return hitHead || hitBody;
+              }
+            }
+          }
+          
+          return false;
+        } catch (e) {
+          console.error('Error checking character hit:', e);
+          return false;
+        }
+      })();
+    `).then((isHit) => {
+      if (isHit) {
+        console.log('🎯 Right-click on character detected');
+        // Get current character index and show menu
+        getCharacterIndexAndShowMenu(x, y);
+      } else {
+        console.log('🎯 Right-click not on character, ignoring');
+      }
+    }).catch((error) => {
+      console.error('Failed to check character hit:', error);
+    });
+  }
+};
+
+// Get current character index and show menu
+const getCharacterIndexAndShowMenu = (x: number, y: number): void => {
   // Get current character index from the renderer
   let currentCharacterIndex = 1; // Default to Hiyori
   
