@@ -115,7 +115,13 @@ export class LAppLive2DManager {
    * サンプルアプリケーションではモデルセットの切り替えを行う。
    * @param index
    */
-  private changeScene(index: number): void {
+  public changeScene(index: number): void {
+    // Validate index
+    if (index < 0 || index >= LAppDefine.ModelDirSize) {
+      console.error(`Invalid character index: ${index}. Must be between 0 and ${LAppDefine.ModelDirSize - 1}`);
+      return;
+    }
+
     this._sceneIndex = index;
 
     if (LAppDefine.DebugLogEnable) {
@@ -137,6 +143,20 @@ export class LAppLive2DManager {
     this._models.pushBack(instance);
   }
 
+  /**
+   * 現在のキャラクターインデックスを取得
+   */
+  public getCurrentCharacterIndex(): number {
+    return this._sceneIndex;
+  }
+
+  /**
+   * 現在のキャラクター名を取得
+   */
+  public getCurrentCharacterName(): string {
+    return LAppDefine.ModelDir[this._sceneIndex];
+  }
+
   public setViewMatrix(m: CubismMatrix44) {
     for (let i = 0; i < 16; i++) {
       this._viewMatrix.getArray()[i] = m.getArray()[i];
@@ -146,7 +166,7 @@ export class LAppLive2DManager {
   /**
    * モデルの追加
    */
-  public addModel(sceneIndex: number = 0): void {
+  public addModel(sceneIndex: number = 1): void { // Default to Hiyori (index 1)
     this._sceneIndex = sceneIndex;
     this.changeScene(this._sceneIndex);
   }
@@ -158,7 +178,7 @@ export class LAppLive2DManager {
     this._subdelegate = null;
     this._viewMatrix = new CubismMatrix44();
     this._models = new csmVector<LAppModel>();
-    this._sceneIndex = 0;
+    this._sceneIndex = 1; // Default to Hiyori (index 1)
   }
 
   /**

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, Menu, MenuItem } from 'electron';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -6,6 +6,17 @@ import { fileURLToPath } from 'url';
 let mainWindow: BrowserWindow | null = null;
 let isDebugMode = process.env.NODE_ENV === 'development';
 let isClickThroughEnabled = false;
+
+// Available characters (matching the order in lappdefine.ts)
+const availableCharacters = [
+  'Haru',
+  'Hiyori',
+  'Mark',
+  'Natori',
+  'Rice',
+  'Mao',
+  'Wanko'
+];
 
 const createWindow = (): void => {
   // Get the primary display's work area
@@ -106,6 +117,11 @@ const createWindow = (): void => {
     mainWindow = null;
   });
 
+  // Handle context menu (right click)
+  mainWindow.webContents.on('context-menu', (event, params) => {
+    showContextMenu(params.x, params.y);
+  });
+
   // Handle window ready
   mainWindow.once('ready-to-show', () => {
     if (mainWindow) {
@@ -158,6 +174,43 @@ const createWindow = (): void => {
   }
 };
 
+// Show context menu on right click
+const showContextMenu = (x: number, y: number): void => {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: 'Select Character',
+      submenu: availableCharacters.map((character, index) => ({
+        label: character,
+        type: 'radio' as const,
+        click: () => {
+          if (mainWindow) {
+            console.log(`🎭 Switching to character: ${character} (index: ${index})`);
+            mainWindow.webContents.send('switch-character', index);
+          }
+        }
+      }))
+    },
+    {
+      type: 'separator'
+    },
+    {
+      label: 'Close',
+      click: () => {
+        if (mainWindow) {
+          console.log('👋 Closing app from context menu');
+          mainWindow.close();
+        }
+      }
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  menu.popup({
+    x: Math.round(x),
+    y: Math.round(y)
+  });
+};
+
 // This method will be called when Electron has finished initialization
 app.whenReady().then(() => {
   createWindow();
@@ -198,6 +251,22 @@ ipcMain.handle('move-window', (event, deltaX: number, deltaY: number) => {
   if (mainWindow) {
     const bounds = mainWindow.getBounds();
     mainWindow.setPosition(bounds.x + deltaX, bounds.y + deltaY);
+  }
+});
+
+// Handle IPC communication
+ipcMain.handle('get-available-characters', () => {
+  return availableCharacters;
+});
+
+ipcMain.handle('get-default-character', () => {
+  // Return Hiyori as default (index 1)
+  return 1;
+});
+
+ipcMain.handle('close-app', () => {
+  if (mainWindow) {
+    mainWindow.close();
   }
 });
 

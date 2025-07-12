@@ -10,6 +10,7 @@ import { CubismFramework, Option } from '@framework/live2dcubismframework';
 import * as LAppDefine from './lappdefine';
 import { LAppPal } from './lapppal';
 import { LAppSubdelegate } from './lappsubdelegate';
+import { LAppLive2DManager } from './lapplive2dmanager';
 import { CubismLogError } from '@framework/utils/cubismdebug';
 
 export let s_instance: LAppDelegate = null;
@@ -183,6 +184,16 @@ export class LAppDelegate {
     this.initializeEventListener();
 
     return true;
+  }
+
+  /**
+   * Live2D Manager を取得する
+   */
+  public getLive2DManager(): LAppLive2DManager | null {
+    if (this._subdelegates && this._subdelegates.getSize() > 0) {
+      return this._subdelegates.at(0).getLive2DManager();
+    }
+    return null;
   }
 
   /**
