@@ -7,6 +7,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   closeApp: () => ipcRenderer.invoke('close-app'),
   toggleClickThrough: () => ipcRenderer.invoke('toggle-click-through'),
   
+  // Character interaction
+  setIgnoreMouseEvents: (ignore: boolean) => ipcRenderer.send('set-ignore-mouse-events', { ignore, options: { forward: true } }),
+  moveWindow: (deltaX: number, deltaY: number) => ipcRenderer.send('window-move', { mouseX: deltaX, mouseY: deltaY }),
+  
   // Character selection
   getAvailableCharacters: () => ipcRenderer.invoke('get-available-characters'),
   getDefaultCharacter: () => ipcRenderer.invoke('get-default-character'),
@@ -31,6 +35,10 @@ declare global {
       // Window controls
       closeApp: () => Promise<void>;
       toggleClickThrough: () => Promise<boolean>;
+      
+      // Character interaction
+      setIgnoreMouseEvents: (ignore: boolean) => void;
+      moveWindow: (deltaX: number, deltaY: number) => void;
       
       // Character selection
       getAvailableCharacters: () => Promise<string[]>;
