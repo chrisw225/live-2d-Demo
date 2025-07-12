@@ -157,6 +157,28 @@ export class LAppLive2DManager {
     return LAppDefine.ModelDir[this._sceneIndex];
   }
 
+  /**
+   * 指定座標でのヒットテストを実行
+   * @param x View座標のX
+   * @param y View座標のY
+   * @returns ヒットした領域の情報
+   */
+  public hitTest(x: number, y: number): { head: boolean; body: boolean } {
+    if (this._models.getSize() === 0) {
+      return { head: false, body: false };
+    }
+
+    const model = this._models.at(0);
+    if (!model || !model.getModel()) {
+      return { head: false, body: false };
+    }
+
+    const headHit = model.hitTest(LAppDefine.HitAreaNameHead, x, y);
+    const bodyHit = model.hitTest(LAppDefine.HitAreaNameBody, x, y);
+
+    return { head: headHit, body: bodyHit };
+  }
+
   public setViewMatrix(m: CubismMatrix44) {
     for (let i = 0; i < 16; i++) {
       this._viewMatrix.getArray()[i] = m.getArray()[i];

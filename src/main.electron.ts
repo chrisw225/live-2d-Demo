@@ -169,6 +169,8 @@ const createWindow = (): void => {
 
   // Handle context menu (right click)
   mainWindow.webContents.on('context-menu', (event, params) => {
+    console.log('🖱️ Context menu event received at:', params.x, params.y);
+    
     // Temporarily disable click-through to show context menu
     if (isClickThroughEnabled && mainWindow) {
       mainWindow.setIgnoreMouseEvents(false);
@@ -203,10 +205,11 @@ const createWindow = (): void => {
     if (!isDebugMode) {
       setTimeout(() => {
         mainWindow?.blur();
-        // Enable click-through for transparent areas
-        mainWindow?.setIgnoreMouseEvents(true, { forward: true });
-        isClickThroughEnabled = true;
-        console.log('🎭 Production mode: Click-through enabled for transparent areas');
+        // Don't enable global click-through - we'll handle it dynamically
+        console.log('🎭 Production mode: Window blurred, dynamic click-through will be handled');
+        
+        // Set up dynamic click-through based on mouse position
+        setupDynamicClickThrough();
       }, 100);
     }
   });
@@ -239,6 +242,111 @@ const createWindow = (): void => {
   }
 };
 
+// Set up dynamic click-through based on mouse position
+const setupDynamicClickThrough = (): void => {
+  if (!mainWindow || isDebugMode) return;
+  
+  // Track mouse position and dynamically enable/disable click-through
+  let lastMouseX = 0;
+  let lastMouseY = 0;
+  let isOverCharacter = false;
+  
+  // Use a timer to periodically check mouse position
+  const checkMousePosition = () => {
+    if (!mainWindow) return;
+    
+    const mousePos = screen.getCursorScreenPoint();
+    const windowBounds = mainWindow.getBounds();
+    
+    // Check if mouse is over this window
+    const isOverWindow = mousePos.x >= windowBounds.x && 
+                        mousePos.x <= windowBounds.x + windowBounds.width &&
+                        mousePos.y >= windowBounds.y && 
+                        mousePos.y <= windowBounds.y + windowBounds.height;
+    
+    if (isOverWindow) {
+      const relativeX = mousePos.x - windowBounds.x;
+      const relativeY = mousePos.y - windowBounds.y;
+      
+      // Check if over character using the same logic as context menu
+      mainWindow.webContents.executeJavaScript(`
+        (function() {
+          try {
+            const canvas = document.querySelector('canvas');
+            if (!canvas) return false;
+            
+            const rect = canvas.getBoundingClientRect();
+            const canvasX = ${relativeX} - rect.left;
+            const canvasY = ${relativeY} - rect.top;
+            
+            if (canvasX < 0 || canvasX > rect.width || canvasY < 0 || canvasY > rect.height) {
+              return false;
+            }
+            
+            if (window.appDelegate) {
+              const manager = window.appDelegate.getLive2DManager();
+              if (manager && manager._models && manager._models.getSize() > 0) {
+                const model = manager._models.at(0);
+                if (model && model.getModel()) {
+                  const view = window.appDelegate._subdelegates.at(0)._view;
+                  if (!view) return false;
+                  
+                  const deviceX = canvasX * window.devicePixelRatio;
+                  const deviceY = canvasY * window.devicePixelRatio;
+                  const viewX = view.transformViewX(deviceX);
+                  const viewY = view.transformViewY(deviceY);
+                  
+                  const hitHead = model.hitTest("Head", viewX, viewY);
+                  const hitBody = model.hitTest("Body", viewX, viewY);
+                  
+                  return hitHead || hitBody;
+                }
+              }
+            }
+            return false;
+          } catch (e) {
+            return false;
+          }
+        })();
+      `).then((overChar) => {
+        if (overChar !== isOverCharacter) {
+          isOverCharacter = overChar;
+          
+          if (isOverCharacter) {
+            // Over character - disable click-through
+            mainWindow?.setIgnoreMouseEvents(false);
+            isClickThroughEnabled = false;
+          } else {
+            // Over transparent area - enable click-through
+            mainWindow?.setIgnoreMouseEvents(true, { forward: true });
+            isClickThroughEnabled = true;
+          }
+        }
+      }).catch(() => {
+        // On error, disable click-through to be safe
+        mainWindow?.setIgnoreMouseEvents(false);
+        isClickThroughEnabled = false;
+      });
+    } else {
+      // Mouse not over window - enable click-through
+      if (!isClickThroughEnabled) {
+        mainWindow?.setIgnoreMouseEvents(true, { forward: true });
+        isClickThroughEnabled = true;
+      }
+    }
+  };
+  
+  // Check mouse position every 100ms
+  const mouseCheckInterval = setInterval(checkMousePosition, 100);
+  
+  // Clean up interval when window is closed
+  mainWindow.on('closed', () => {
+    clearInterval(mouseCheckInterval);
+  });
+  
+  console.log('🎯 Dynamic click-through setup complete');
+};
+
 // Show context menu on right click (only if over character)
 const showContextMenu = (x: number, y: number): void => {
   // Check if the mouse is over the character using Live2D hit areas
@@ -246,17 +354,25 @@ const showContextMenu = (x: number, y: number): void => {
     mainWindow.webContents.executeJavaScript(`
       (function() {
         try {
+          console.log('🖱️ Checking right-click at coordinates:', ${x}, ${y});
+          
           // Get the canvas element
           const canvas = document.querySelector('canvas');
-          if (!canvas) return false;
+          if (!canvas) {
+            console.log('❌ Canvas not found');
+            return false;
+          }
           
           // Get canvas bounds
           const rect = canvas.getBoundingClientRect();
           const canvasX = ${x} - rect.left;
           const canvasY = ${y} - rect.top;
           
+          console.log('🎯 Canvas bounds:', rect.width, 'x', rect.height, 'Canvas pos:', canvasX, canvasY);
+          
           // Check if click is within canvas bounds
           if (canvasX < 0 || canvasX > rect.width || canvasY < 0 || canvasY > rect.height) {
+            console.log('❌ Click outside canvas bounds');
             return false;
           }
           
@@ -266,38 +382,55 @@ const showContextMenu = (x: number, y: number): void => {
             if (manager && manager._models && manager._models.getSize() > 0) {
               const model = manager._models.at(0);
               if (model && model.getModel()) {
-                // Convert screen coordinates to Live2D coordinates
+                // Get the view from the subdelegate for coordinate transformation
                 const view = window.appDelegate._subdelegates.at(0)._view;
-                const viewX = view.transformViewX(canvasX * window.devicePixelRatio);
-                const viewY = view.transformViewY(canvasY * window.devicePixelRatio);
+                if (!view) {
+                  console.log('❌ View not found');
+                  return false;
+                }
+                
+                // Convert screen coordinates to Live2D coordinates following the same pattern as lappview.ts
+                const deviceX = canvasX * window.devicePixelRatio;
+                const deviceY = canvasY * window.devicePixelRatio;
+                
+                // Transform to view coordinates using the view's transformation methods
+                const viewX = view.transformViewX(deviceX);
+                const viewY = view.transformViewY(deviceY);
                 
                 // Check if click is on Head or Body hit areas
                 const hitHead = model.hitTest("Head", viewX, viewY);
                 const hitBody = model.hitTest("Body", viewX, viewY);
                 
-                console.log('Hit test results - Head:', hitHead, 'Body:', hitBody, 'Coords:', viewX, viewY);
+                console.log('🎯 Hit test results - Head:', hitHead, 'Body:', hitBody, 'Coords - device:', deviceX, deviceY, 'view:', viewX, viewY);
                 
                 return hitHead || hitBody;
+              } else {
+                console.log('❌ Model not loaded');
               }
+            } else {
+              console.log('❌ Manager or models not available');
             }
+          } else {
+            console.log('❌ AppDelegate not available');
           }
           
           return false;
         } catch (e) {
-          console.error('Error checking character hit:', e);
+          console.error('❌ Error checking character hit:', e);
           return false;
         }
       })();
     `).then((isHit) => {
+      console.log('🎯 Hit test result:', isHit);
       if (isHit) {
-        console.log('🎯 Right-click on character detected');
+        console.log('🎯 Right-click on character detected, showing menu');
         // Get current character index and show menu
         getCharacterIndexAndShowMenu(x, y);
       } else {
         console.log('🎯 Right-click not on character, ignoring');
       }
     }).catch((error) => {
-      console.error('Failed to check character hit:', error);
+      console.error('❌ Failed to check character hit:', error);
     });
   }
 };
