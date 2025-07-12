@@ -29,16 +29,16 @@ const createWindow = (): void => {
     height: 600,
     x: Math.max(0, width - 820), // Position near right edge, but ensure it's visible
     y: Math.max(0, height - 620), // Position near bottom edge, but ensure it's visible
-    frame: false, // Frameless window
-    transparent: true, // Transparent background
+    frame: false, // Frameless window in both modes
+    transparent: !isDebugMode, // Transparent in production, opaque in debug
     alwaysOnTop: true, // Always on top
-    skipTaskbar: true, // Don't show in taskbar
+    skipTaskbar: !isDebugMode, // Show in taskbar in debug mode
     resizable: isDebugMode, // Only resizable in debug mode
     movable: isDebugMode, // Only movable in debug mode
     minimizable: false,
     maximizable: false,
     closable: true,
-    focusable: false, // Don't steal focus
+    focusable: isDebugMode, // Allow focus in debug mode
     hasShadow: false, // No shadow
     show: false, // Don't show until ready
     webPreferences: {
@@ -81,13 +81,13 @@ const createWindow = (): void => {
 
   // Load the app
   if (isDebugMode) {
-    // In development, load from Vite dev server
-    console.log('🌐 Loading from Vite dev server...');
-    mainWindow.loadURL('http://localhost:5000').catch(err => {
-      console.error('❌ Failed to load from dev server:', err);
-      // Fallback to built files
-      console.log('🔄 Falling back to built files...');
-      mainWindow.loadFile(path.join(__dirname, 'index.html'));
+    // In development, load from built files with debug styling
+    console.log('🔧 Loading built files in debug mode...');
+    const indexPath = path.join(__dirname, 'index.html');
+    console.log('📄 Index file path:', indexPath);
+    
+    mainWindow.loadFile(indexPath).catch(err => {
+      console.error('❌ Failed to load index.html:', err);
     });
     
     // Open DevTools in debug mode
@@ -176,12 +176,42 @@ const createWindow = (): void => {
 
 // Show context menu on right click
 const showContextMenu = (x: number, y: number): void => {
+  // Get current character index from the renderer
+  let currentCharacterIndex = 1; // Default to Hiyori
+  
+  if (mainWindow) {
+    mainWindow.webContents.executeJavaScript(`
+      (function() {
+        try {
+          if (window.appDelegate) {
+            const manager = window.appDelegate.getLive2DManager();
+            return manager ? manager.getCurrentCharacterIndex() : 1;
+          }
+          return 1;
+        } catch (e) {
+          console.error('Error getting current character index:', e);
+          return 1;
+        }
+      })();
+    `).then((index) => {
+      currentCharacterIndex = index || 1;
+      buildAndShowMenu(x, y, currentCharacterIndex);
+    }).catch((error) => {
+      console.error('Failed to get current character index:', error);
+      buildAndShowMenu(x, y, 1); // Default to Hiyori
+    });
+  }
+};
+
+// Build and show the context menu
+const buildAndShowMenu = (x: number, y: number, currentCharacterIndex: number): void => {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: 'Select Character',
       submenu: availableCharacters.map((character, index) => ({
         label: character,
         type: 'radio' as const,
+        checked: index === currentCharacterIndex, // Set checked state based on current character
         click: () => {
           if (mainWindow) {
             console.log(`🎭 Switching to character: ${character} (index: ${index})`);

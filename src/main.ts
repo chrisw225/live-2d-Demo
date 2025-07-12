@@ -68,6 +68,9 @@ window.addEventListener(
     // Start the application
     appDelegate.run();
     
+    // Expose appDelegate globally for context menu access
+    (window as any).appDelegate = appDelegate;
+    
     console.log('🎭 Live2D application started with character switching support');
   },
   { passive: true }

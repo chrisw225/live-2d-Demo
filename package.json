@@ -11,7 +11,7 @@
     "serve": "vite preview --port 5000 --host",
     "clean": "rimraf dist",
     "build:electron-files": "node scripts/build-electron.js",
-    "electron": "npm run build:electron-files && electron .",
+    "electron": "npm run build:prod && npm run build:electron-files && electron .",
     "electron:dev": "npm run build && npm run build:electron-files && cross-env NODE_ENV=development electron .",
     "electron:pack": "npm run build:prod && npm run build:electron-files && electron-builder",
     "dev": "concurrently \"npm run start\" \"wait-on http://localhost:5000 && npm run build:electron-files && cross-env NODE_ENV=development electron .\"",
