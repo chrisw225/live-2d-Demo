@@ -3,11 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TypeScript HTML App</title>
+  <title>Live2D Electron Demo</title>
   <style>
     html, body {
       overflow: hidden;
       margin: 0;
+      padding: 0;
+      background: transparent; /* Transparent background for Electron */
     }
     html {
       overscroll-behavior-x: none;
@@ -16,10 +18,46 @@
     body {
       display: flex;
       flex-wrap: wrap;
+      /* Ensure the body fills the window */
+      width: 100vw;
+      height: 100vh;
     }
     body > canvas:only-child {
       width: 100vw;
       height: 100vh;
+    }
+    
+    /* Debug controls - only visible in development */
+    .debug-controls {
+      position: fixed;
+      top: 30px;
+      right: 10px;
+      z-index: 10000;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 12px;
+      display: none;
+    }
+    
+    .debug-controls.visible {
+      display: block;
+    }
+    
+    .debug-controls button {
+      margin: 2px;
+      padding: 5px 10px;
+      background: #333;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    
+    .debug-controls button:hover {
+      background: #555;
     }
   </style>
   <!-- Live2DCubismCore script -->
@@ -28,5 +66,41 @@
   <script src = "./src/main.ts" type="module"></script>
 </head>
 <body>
+  <div class="debug-controls" id="debugControls">
+    <div>Live2D Electron Debug</div>
+    <button onclick="toggleDebugMode()">Toggle Debug</button>
+    <button onclick="toggleClickThrough()">Toggle Click-Through</button>
+    <button onclick="closeApp()">Close App</button>
+  </div>
+  
+  <script>
+    // Debug controls functionality
+    function toggleDebugMode() {
+      if (window.electronAPI) {
+        window.electronAPI.toggleDebug().then(isDebug => {
+          console.log('Debug mode:', isDebug);
+        });
+      }
+    }
+    
+    function toggleClickThrough() {
+      if (window.electronAPI) {
+        window.electronAPI.toggleClickThrough().then(isClickThrough => {
+          console.log('Click-through mode:', isClickThrough);
+        });
+      }
+    }
+    
+    function closeApp() {
+      if (window.electronAPI) {
+        window.close();
+      }
+    }
+    
+    // Show debug controls if in development mode
+    if (window.electronAPI && window.electronAPI.isDevelopment) {
+      document.getElementById('debugControls').classList.add('visible');
+    }
+  </script>
 </body>
 </html>
