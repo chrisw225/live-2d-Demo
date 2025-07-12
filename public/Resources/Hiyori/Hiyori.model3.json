@@ -86,7 +86,11 @@
 	],
 	"HitAreas": [
 		{
-			"Id": "HitArea",
+			"Id": "HitAreaHead",
+			"Name": "Head"
+		},
+		{
+			"Id": "HitAreaBody",
 			"Name": "Body"
 		}
 	]
