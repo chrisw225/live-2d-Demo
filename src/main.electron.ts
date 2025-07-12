@@ -18,6 +18,55 @@ const availableCharacters = [
   'Wanko'
 ];
 
+// Build and show the context menu
+const buildAndShowMenu = (x: number, y: number, currentCharacterIndex: number): void => {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: 'Select Character',
+      submenu: availableCharacters.map((character, index) => ({
+        label: character,
+        type: 'radio' as const,
+        checked: index === currentCharacterIndex, // Set checked state based on current character
+        click: () => {
+          if (mainWindow) {
+            console.log(`🎭 Switching to character: ${character} (index: ${index})`);
+            mainWindow.webContents.send('switch-character', index);
+          }
+        }
+      }))
+    },
+    {
+      type: 'separator'
+    },
+    {
+      label: 'Close',
+      click: () => {
+        if (mainWindow) {
+          console.log('👋 Closing app from context menu');
+          mainWindow.close();
+        }
+      }
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  
+  // Re-enable click-through after menu is closed
+  menu.on('menu-will-close', () => {
+    if (!isDebugMode && mainWindow) {
+      setTimeout(() => {
+        mainWindow?.setIgnoreMouseEvents(true, { forward: true });
+        console.log('🎯 Re-enabled click-through after context menu closed');
+      }, 100);
+    }
+  });
+  
+  menu.popup({
+    x: Math.round(x),
+    y: Math.round(y)
+  });
+};
+
 const createWindow = (): void => {
   // Get the primary display's work area
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -30,6 +79,7 @@ const createWindow = (): void => {
     x: Math.max(0, width - 820), // Position near right edge, but ensure it's visible
     y: Math.max(0, height - 620), // Position near bottom edge, but ensure it's visible
     frame: false, // Frameless window in both modes
+    titleBarStyle: 'hidden', // Ensure no title bar
     transparent: !isDebugMode, // Transparent in production, opaque in debug
     alwaysOnTop: true, // Always on top
     skipTaskbar: !isDebugMode, // Show in taskbar in debug mode
@@ -119,7 +169,18 @@ const createWindow = (): void => {
 
   // Handle context menu (right click)
   mainWindow.webContents.on('context-menu', (event, params) => {
+    // Temporarily disable click-through to show context menu
+    if (isClickThroughEnabled && mainWindow) {
+      mainWindow.setIgnoreMouseEvents(false);
+      console.log('🎯 Temporarily disabled click-through for context menu');
+    }
+    
     showContextMenu(params.x, params.y);
+  });
+
+  // Add mouse enter/leave events to handle click-through dynamically
+  mainWindow.webContents.on('cursor-changed', (event, type) => {
+    // This helps us know when cursor changes, but we need a better approach
   });
 
   // In production mode, prevent the window from stealing focus
@@ -142,7 +203,10 @@ const createWindow = (): void => {
     if (!isDebugMode) {
       setTimeout(() => {
         mainWindow?.blur();
-        console.log('🎭 Production mode: Window blurred to prevent focus stealing');
+        // Enable click-through for transparent areas
+        mainWindow?.setIgnoreMouseEvents(true, { forward: true });
+        isClickThroughEnabled = true;
+        console.log('🎭 Production mode: Click-through enabled for transparent areas');
       }, 100);
     }
   });
@@ -265,44 +329,6 @@ const getCharacterIndexAndShowMenu = (x: number, y: number): void => {
       buildAndShowMenu(x, y, 1); // Default to Hiyori
     });
   }
-};
-
-// Build and show the context menu
-const buildAndShowMenu = (x: number, y: number, currentCharacterIndex: number): void => {
-  const template: Electron.MenuItemConstructorOptions[] = [
-    {
-      label: 'Select Character',
-      submenu: availableCharacters.map((character, index) => ({
-        label: character,
-        type: 'radio' as const,
-        checked: index === currentCharacterIndex, // Set checked state based on current character
-        click: () => {
-          if (mainWindow) {
-            console.log(`🎭 Switching to character: ${character} (index: ${index})`);
-            mainWindow.webContents.send('switch-character', index);
-          }
-        }
-      }))
-    },
-    {
-      type: 'separator'
-    },
-    {
-      label: 'Close',
-      click: () => {
-        if (mainWindow) {
-          console.log('👋 Closing app from context menu');
-          mainWindow.close();
-        }
-      }
-    }
-  ];
-
-  const menu = Menu.buildFromTemplate(template);
-  menu.popup({
-    x: Math.round(x),
-    y: Math.round(y)
-  });
 };
 
 // This method will be called when Electron has finished initialization
