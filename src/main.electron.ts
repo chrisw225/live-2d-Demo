@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 // Keep a global reference of the window object
 let mainWindow: BrowserWindow | null = null;
-let isDebugMode = process.env.NODE_ENV === 'development';
+// Clean desktop avatar mode - always production-like
 let isClickThroughEnabled = false;
 
 // Available characters (matching the order in lappdefine.ts)
@@ -53,7 +53,7 @@ const buildAndShowMenu = (x: number, y: number, currentCharacterIndex: number): 
   
   // Re-enable click-through after menu is closed
   menu.on('menu-will-close', () => {
-    if (!isDebugMode && mainWindow) {
+    if (mainWindow) {
       setTimeout(() => {
         mainWindow?.setIgnoreMouseEvents(true, { forward: true });
         console.log('🎯 Re-enabled click-through after context menu closed');
@@ -78,13 +78,13 @@ const createWindow = (): void => {
     height: 600,
     x: Math.max(0, width - 820), // Position near right edge, but ensure it's visible
     y: Math.max(0, height - 620), // Position near bottom edge, but ensure it's visible
-    frame: false, // Frameless window in both modes
+    frame: false, // Frameless window 
     titleBarStyle: 'hidden', // Ensure no title bar
-    transparent: !isDebugMode, // Transparent in production, opaque in debug
+    transparent: true, // Always transparent for clean desktop avatar
     alwaysOnTop: true, // Always on top
-    skipTaskbar: !isDebugMode, // Show in taskbar in debug mode
-    resizable: isDebugMode, // Only resizable in debug mode
-    movable: isDebugMode, // Only movable in debug mode
+    skipTaskbar: true, // Hide from taskbar for clean desktop avatar
+    resizable: false, // Not resizable for clean desktop avatar
+    movable: false, // Not movable for clean desktop avatar
     minimizable: false,
     maximizable: false,
     closable: true,
@@ -100,58 +100,16 @@ const createWindow = (): void => {
   });
 
   console.log('🪟 Window created with dimensions:', mainWindow.getBounds());
-  console.log('🔧 Debug mode:', isDebugMode);
-  console.log('📁 Loading from:', isDebugMode ? 'http://localhost:5000' : path.join(__dirname, 'index.html'));
+  console.log('🎭 Clean desktop avatar mode');
 
-  // Add debug border if in debug mode
-  if (isDebugMode) {
-    mainWindow.webContents.insertCSS(`
-      body {
-        border: 2px solid #ff0000 !important;
-        box-sizing: border-box !important;
-      }
-      
-      /* Debug info overlay */
-      body::before {
-        content: "DEBUG MODE - Live2D Electron App";
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        background: rgba(255, 0, 0, 0.8);
-        color: white;
-        padding: 5px;
-        font-family: monospace;
-        font-size: 12px;
-        z-index: 9999;
-        text-align: center;
-      }
-    `);
-  }
-
-  // Load the app
-  if (isDebugMode) {
-    // In development, load from built files with debug styling
-    console.log('🔧 Loading built files in debug mode...');
-    const indexPath = path.join(__dirname, 'index.html');
-    console.log('📄 Index file path:', indexPath);
-    
-    mainWindow.loadFile(indexPath).catch(err => {
-      console.error('❌ Failed to load index.html:', err);
-    });
-    
-    // Open DevTools in debug mode
-    mainWindow.webContents.openDevTools();
-  } else {
-    // In production, load from built files
-    console.log('📁 Loading from built files...');
-    const indexPath = path.join(__dirname, 'index.html');
-    console.log('📄 Index file path:', indexPath);
-    
-    mainWindow.loadFile(indexPath).catch(err => {
-      console.error('❌ Failed to load index.html:', err);
-    });
-  }
+  // Load the app - clean desktop avatar mode
+  console.log('📁 Loading from built files...');
+  const indexPath = path.join(__dirname, 'index.html');
+  console.log('📄 Index file path:', indexPath);
+  
+  mainWindow.loadFile(indexPath).catch(err => {
+    console.error('❌ Failed to load index.html:', err);
+  });
 
   // Add error handling for web contents
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
@@ -185,66 +143,35 @@ const createWindow = (): void => {
     // This helps us know when cursor changes, but we need a better approach
   });
 
-  // In production mode, prevent the window from stealing focus
-  if (!isDebugMode) {
-    mainWindow.on('focus', () => {
-      // Immediately blur the window to prevent focus stealing
-      mainWindow?.blur();
-    });
-    
-    // Also prevent the window from showing in Alt+Tab
-    mainWindow.setSkipTaskbar(true);
-  }
+  // Clean desktop avatar mode - prevent focus stealing
+  mainWindow.on('focus', () => {
+    // Immediately blur the window to prevent focus stealing
+    mainWindow?.blur();
+  });
+  
+  // Already set skipTaskbar to true in window options
 
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
     console.log('🎭 Window ready to show');
     mainWindow?.show();
     
-    // In production mode, blur immediately after showing to prevent focus stealing
-    if (!isDebugMode) {
-      setTimeout(() => {
-        mainWindow?.blur();
-        // Don't enable global click-through - we'll handle it dynamically
-        console.log('🎭 Production mode: Window blurred, dynamic click-through will be handled');
-        
-        // Set up dynamic click-through based on mouse position
-        setupDynamicClickThrough();
-      }, 100);
-    }
+    // Clean desktop avatar mode - blur immediately after showing to prevent focus stealing
+    setTimeout(() => {
+      mainWindow?.blur();
+      console.log('🎭 Clean desktop avatar mode: Window blurred, dynamic click-through will be handled');
+      
+      // Set up dynamic click-through based on mouse position
+      setupDynamicClickThrough();
+    }, 100);
   });
 
-  // Handle mouse events for dragging (only in debug mode)
-  if (isDebugMode) {
-    // Make window draggable in debug mode
-    mainWindow.webContents.executeJavaScript(`
-      let isDragging = false;
-      let dragOffset = { x: 0, y: 0 };
-      
-      document.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        dragOffset.x = e.clientX;
-        dragOffset.y = e.clientY;
-      });
-      
-      document.addEventListener('mouseup', () => {
-        isDragging = false;
-      });
-      
-      document.addEventListener('mousemove', (e) => {
-        if (isDragging) {
-          const deltaX = e.clientX - dragOffset.x;
-          const deltaY = e.clientY - dragOffset.y;
-          window.electronAPI?.moveWindow(deltaX, deltaY);
-        }
-      });
-    `);
-  }
+  // No dragging for clean desktop avatar mode
 };
 
 // Set up dynamic click-through based on mouse position
 const setupDynamicClickThrough = (): void => {
-  if (!mainWindow || isDebugMode) return;
+  if (!mainWindow) return;
   
   // Track mouse position and dynamically enable/disable click-through
   let lastMouseX = 0;
@@ -482,14 +409,7 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Handle IPC messages
-ipcMain.handle('toggle-debug', () => {
-  isDebugMode = !isDebugMode;
-  if (mainWindow) {
-    mainWindow.reload();
-  }
-  return isDebugMode;
-});
+// Handle IPC messages - debug mode removed for clean desktop avatar
 
 ipcMain.handle('toggle-click-through', () => {
   if (mainWindow) {

@@ -2,10 +2,6 @@ import { defineConfig, UserConfig, ConfigEnv } from 'vite';
 
 export default defineConfig((env: ConfigEnv): UserConfig => {
   let common: UserConfig = {
-    server: {
-      port: 5000,
-      host: '0.0.0.0', // Allow access from Electron
-    },
     root: './',
     base: './', // Use relative base for Electron
     publicDir: './public',
