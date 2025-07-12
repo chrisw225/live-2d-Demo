@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Electron Test</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    
+    .container {
+      text-align: center;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    
+    .status {
+      color: #666;
+      font-size: 18px;
+      margin: 10px 0;
+    }
+    
+    .success {
+      color: #27ae60;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎭 Electron Window Test</h1>
+    <div class="status">✅ HTML is loading</div>
+    <div class="status">✅ CSS is working</div>
+    <div class="status" id="jsStatus">⏳ JavaScript loading...</div>
+    <div class="status" id="electronStatus">⏳ Checking Electron API...</div>
+    <div style="margin-top: 20px;">
+      <button onclick="testWindow()" style="padding: 10px 20px; font-size: 16px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer;">Test Window</button>
+    </div>
+  </div>
+  
+  <script>
+    // Test JavaScript
+    document.getElementById('jsStatus').innerHTML = '✅ JavaScript is working';
+    document.getElementById('jsStatus').className = 'status success';
+    
+    // Test Electron API
+    if (window.electronAPI) {
+      document.getElementById('electronStatus').innerHTML = '✅ Electron API detected';
+      document.getElementById('electronStatus').className = 'status success';
+    } else {
+      document.getElementById('electronStatus').innerHTML = '❌ Electron API not found';
+    }
+    
+    function testWindow() {
+      alert('Window interaction test successful!');
+    }
+    
+    console.log('Test HTML loaded successfully');
+  </script>
+</body>
+</html> 

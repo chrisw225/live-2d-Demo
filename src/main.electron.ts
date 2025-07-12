@@ -16,8 +16,8 @@ const createWindow = (): void => {
   mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
-    x: width - 820, // Position near right edge
-    y: height - 620, // Position near bottom edge
+    x: Math.max(0, width - 820), // Position near right edge, but ensure it's visible
+    y: Math.max(0, height - 620), // Position near bottom edge, but ensure it's visible
     frame: false, // Frameless window
     transparent: true, // Transparent background
     alwaysOnTop: true, // Always on top
@@ -29,6 +29,7 @@ const createWindow = (): void => {
     closable: true,
     focusable: false, // Don't steal focus
     hasShadow: false, // No shadow
+    show: false, // Don't show until ready
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -36,6 +37,10 @@ const createWindow = (): void => {
       webSecurity: false, // Allow local file access for Live2D assets
     },
   });
+
+  console.log('🪟 Window created with dimensions:', mainWindow.getBounds());
+  console.log('🔧 Debug mode:', isDebugMode);
+  console.log('📁 Loading from:', isDebugMode ? 'http://localhost:5000' : path.join(__dirname, 'index.html'));
 
   // Add debug border if in debug mode
   if (isDebugMode) {
@@ -66,14 +71,35 @@ const createWindow = (): void => {
   // Load the app
   if (isDebugMode) {
     // In development, load from Vite dev server
-    mainWindow.loadURL('http://localhost:5000');
+    console.log('🌐 Loading from Vite dev server...');
+    mainWindow.loadURL('http://localhost:5000').catch(err => {
+      console.error('❌ Failed to load from dev server:', err);
+      // Fallback to built files
+      console.log('🔄 Falling back to built files...');
+      mainWindow.loadFile(path.join(__dirname, 'index.html'));
+    });
     
     // Open DevTools in debug mode
     mainWindow.webContents.openDevTools();
   } else {
     // In production, load from built files
-    mainWindow.loadFile(path.join(__dirname, '../index.html'));
+    console.log('📁 Loading from built files...');
+    const indexPath = path.join(__dirname, 'index.html');
+    console.log('📄 Index file path:', indexPath);
+    
+    mainWindow.loadFile(indexPath).catch(err => {
+      console.error('❌ Failed to load index.html:', err);
+    });
   }
+
+  // Add error handling for web contents
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('🚫 Failed to load:', errorCode, errorDescription);
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('✅ Page loaded successfully');
+  });
 
   // Handle window closed
   mainWindow.on('closed', () => {
@@ -83,15 +109,26 @@ const createWindow = (): void => {
   // Handle window ready
   mainWindow.once('ready-to-show', () => {
     if (mainWindow) {
+      console.log('🎭 Window ready to show');
       mainWindow.show();
+      console.log('👀 Window shown');
       
       // Set click-through in production (not debug mode)
       if (!isDebugMode) {
         mainWindow.setIgnoreMouseEvents(true, { forward: true });
         isClickThroughEnabled = true;
+        console.log('👆 Click-through enabled');
       }
     }
   });
+
+  // Force show after a delay if ready-to-show doesn't fire
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isVisible()) {
+      console.log('⏰ Force showing window after timeout');
+      mainWindow.show();
+    }
+  }, 3000);
 
   // Handle mouse events for dragging (only in debug mode)
   if (isDebugMode) {

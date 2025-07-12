@@ -11,6 +11,8 @@
       padding: 0;
       background: transparent; /* Transparent background for Electron */
     }
+    
+    /* Clean transparent background for production */
     html {
       overscroll-behavior-x: none;
       touch-action: none;
@@ -97,7 +99,7 @@
       }
     }
     
-    // Show debug controls if in development mode
+        // Show debug controls only in development mode
     if (window.electronAPI && window.electronAPI.isDevelopment) {
       document.getElementById('debugControls').classList.add('visible');
     }
